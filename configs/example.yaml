@@ -1,0 +1,5 @@
+data:
+  uri: data/example        # must contain train/ val/ test/
+model:
+  name: yolo               # key in model_factory.TRAINERS
+train: {}                  # hyperparameters, not decided yet
