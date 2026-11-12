@@ -12,7 +12,6 @@ def train(config_path: str):
     cfg = tasks.load_config(config_path)
     # TODO: wire once task arguments are decided
     # preprocess -> train -> evaluate -> register
-    raise NotImplementedError
 
 
 @flow

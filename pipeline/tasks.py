@@ -3,13 +3,17 @@
 from prefect import task
 
 from pipeline.config import Config
+import yaml
 
 
 @task
 def load_config(config_path: str) -> Config:
     """Read the experiment YAML and validate it into a Config."""
-    raise NotImplementedError
+    with open(config_path, "r") as f:
+        data = yaml.save_load(f) 
 
+    print(data['data']['uri'])
+    print(data['model']['name'])
 
 @task
 def preprocess():

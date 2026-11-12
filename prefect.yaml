@@ -1,0 +1,28 @@
+# generic metadata
+prefect-version: null
+name: MLOps-training-pipeline
+
+# preparation steps
+build: null
+push: null
+
+# runtime steps
+pull: null
+
+# deployment configurations
+deployments:
+- # base metadata
+  name: train_pipeline
+  version: null
+  tags: ["train"]
+  description: null
+
+  # flow-specific fields
+  entrypoint: pipeline/flow.py:train
+  parameters: {}
+
+  # infra-specific fields
+  work_pool:
+    name: null
+    work_queue_name: null
+    job_variables: {}
