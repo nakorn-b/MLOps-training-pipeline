@@ -1,5 +1,7 @@
 data:
-  uri: data/example        # must contain train/ val/ test/
+  uri: data/cifar10-mini     # one subfolder per class
 model:
-  name: yolo               # key in model_factory.TRAINERS
-train: {}                  # hyperparameters, not decided yet
+  name: logistic_regression  # key in model_factory.TRAINERS
+params:                      # passed to the model; logged to MLflow as params.<key>
+  C: 1.0                     # inverse regularisation strength
+  max_iter: 200

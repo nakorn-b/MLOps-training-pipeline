@@ -26,7 +26,7 @@ model_factory.py     TRAINERS registry (name -> Trainer class) + get_trainer
 trainers/base.py     Trainer(ABC): load, preprocess, train, predict
 trainers/dino.py     DinoTrainer  ("dinov3")
 trainers/yolo.py     YoloTrainer  ("yolo")
-pipeline/config.py   pydantic Config (data, model, train sections)
+pipeline/config.py   pydantic Config (data, model, params sections)
 pipeline/tasks.py    Prefect tasks: load_config, preprocess, train, evaluate, register
 pipeline/flow.py     Prefect flows: train, retrain
 configs/             one YAML per experiment
@@ -41,12 +41,22 @@ configs/             one YAML per experiment
 - **`TRAINERS` maps names to classes, not instances.** `get_trainer` builds only
   the requested one; an unknown name raises an error listing the valid names.
 - **One YAML is the only experiment input.** Infrastructure settings stay out of
-  it: the MLflow tracking URI comes from `MLFLOW_TRACKING_URI` (fallback
-  `./mlruns`).
+  it: `register` reads the MLflow tracking URI from `MLFLOW_TRACKING_URI`
+  (fallback `sqlite:///mlflow.db`) and the experiment name from
+  `EXPERIMENT_NAME` (fallback `MLOps-pipeline`). Both are set in `.env`, which
+  `pipeline/tasks.py` loads on import.
 - **Config is typed.** `load_config` returns a pydantic `Config`, so bad YAML
-  fails before training starts. The data location is `data.uri` (local or remote).
-- **Data arrives pre-split** into `train/`, `val/`, `test/` under `data.uri`.
-  `preprocess()` converts formats only and never splits.
+  fails before training starts. The data location is `data.uri`.
+- **Hyperparameters live under `params:`** in the YAML as a free-form dict,
+  because the keys are model-specific. The trainer passes them to its model and
+  validates them. `register` logs the whole YAML to MLflow as flattened params
+  (`data.uri`, `model.name`, `params.<key>`) plus the metrics.
+- **Data arrives unsplit**: `data.uri` is a folder with one subfolder per class.
+  The `preprocess` task does two things, in order:
+  1. Split: assign every image to train / val / test (80/10/10, stratified by
+     class, fixed seed) in a manifest DataFrame with columns `path`, `label`,
+     `split`. No files are moved or copied. This part is generic pipeline code.
+  2. Model-specific preparation: pass the manifest to `trainer.preprocess()`.
 - **Task scope is image classification** for now (YOLO `-cls`, DINOv3 backbone
   + classifier head).
 
@@ -55,12 +65,15 @@ configs/             one YAML per experiment
 | Method | Meaning |
 |---|---|
 | `load()` | Build the model and load starting weights. Not data loading. |
-| `preprocess()` | Convert the dataset to this model's format. |
+| `preprocess(manifest_df)` | Prepare the split dataset for this model (resize, normalise, convert format). |
 | `train()` | Train. |
-| `predict()` | Predict class labels. |
+| `predict()` | Predict class labels for the test split. |
+
+Trainers also expose `y_test` (true test labels), which the `evaluate` task reads.
 
 `evaluate()` is planned future work. Until then the `evaluate` task is generic
-pipeline code: it calls `predict()` on the test split and computes accuracy / F1.
+pipeline code: it scores the test split and returns accuracy and
+macro-averaged precision, recall and F1.
 
 ## Flows
 
