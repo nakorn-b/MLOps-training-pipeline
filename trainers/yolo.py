@@ -7,7 +7,7 @@ class YoloTrainer(Trainer):
     def load(self):
         raise NotImplementedError
 
-    def preprocess(self):
+    def preprocess(self, manifest_df):
         raise NotImplementedError
 
     def train(self):
