@@ -1,7 +1,8 @@
+from model_factory import get_trainer
 from prefect import flow
 
 from pipeline import tasks
-
+import pandas as pd
 
 @flow
 def train(config_path: str):
@@ -10,6 +11,11 @@ def train(config_path: str):
     Gating: compare against the champion's logged metric.
     """
     cfg = tasks.load_config(config_path)
+    trainer = get_trainer(cfg.model.name, cfg) #TODO: chamge 2nd params to cfg.params
+    tasks.preprocess(cfg.data.uri, trainer)
+    tasks.train(trainer)
+    metrics = tasks.evaluate(trainer)
+    tasks.register(cfg, metrics)
     # TODO: wire once task arguments are decided
     # preprocess -> train -> evaluate -> register
 
