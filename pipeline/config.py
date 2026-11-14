@@ -1,19 +1,19 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
 class DataConfig(BaseModel):
-    uri: str  # local path or remote URI; data is already split into train/ val/ test/
+    uri: str  # dataset folder with one subfolder per class; the pipeline splits it
 
 
 class ModelConfig(BaseModel):
     name: str  # key in model_factory.TRAINERS
 
 
-class TrainConfig(BaseModel):
-    """Training hyperparameters. Fields not decided yet."""
-
-
 class Config(BaseModel):
     data: DataConfig
     model: ModelConfig
-    train: TrainConfig = TrainConfig()
+    # Hyperparameters for the chosen model. Keys are model-specific, so the
+    # trainer validates them; every key is logged to MLflow as `params.<key>`.
+    params: dict[str, Any] = {}
