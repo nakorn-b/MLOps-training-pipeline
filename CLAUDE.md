@@ -8,6 +8,35 @@ Status: **skeleton**. Signatures exist, bodies raise `NotImplementedError`.
 Task and `Trainer` method arguments are deliberately undecided; do not invent
 them without asking.
 
+## Agent harness
+
+### Startup Workflow
+
+Before writing code:
+
+1. Read `feature_list.json` and `progress.md` (and `session-handoff.md` if recent).
+2. Run `./init.sh`. If it fails, fix that before adding scope.
+3. **One feature at a time**: pick one unfinished feature from `feature_list.json`; respect its
+   `dependencies`. Stay in scope: do not change files unrelated to that feature.
+
+`./init.sh` runs `uv sync`, an import check, and the train flow end to end on
+`data/cifar10-mini` with a temporary Prefect server and a throwaway MLflow
+database. It needs no running servers and never writes to `mlflow.db`.
+
+### Definition of Done
+
+A feature is done only when all of these are true:
+
+- its "Done when" checks in `feature_list.json` pass;
+- `./init.sh` is green, including the end-to-end step (not skipped);
+- the command and result are recorded in the feature's `evidence` field.
+
+### End of Session
+
+Before ending: update `feature_list.json` and `progress.md` (and
+`session-handoff.md` for larger sessions), and note any blocker that leaves
+`./init.sh` red.
+
 ## Commands
 
 ```bash
@@ -64,10 +93,11 @@ configs/             one YAML per experiment
 
 | Method | Meaning |
 |---|---|
-| `load()` | Build the model and load starting weights. Not data loading. |
+| `load(model_uri=None)` | Build the model. `None`: fresh/pretrained weights; otherwise start from that MLflow model URI (the flow resolves it, e.g. the champion). Not data loading. |
 | `preprocess(manifest_df)` | Prepare the split dataset for this model (resize, normalise, convert format). |
 | `train()` | Train. |
 | `predict()` | Predict class labels for the test split. |
+| `log_model()` | Log the trained model to the active MLflow run in this model's flavor; return its model URI. Called by `register`. |
 
 Trainers also expose `y_test` (true test labels), which the `evaluate` task reads.
 
