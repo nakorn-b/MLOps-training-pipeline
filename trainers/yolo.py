@@ -4,7 +4,7 @@ from trainers.base import Trainer
 class YoloTrainer(Trainer):
     """YOLO classification (-cls) variant."""
 
-    def load(self):
+    def load(self, model_uri: str | None = None):
         raise NotImplementedError
 
     def preprocess(self, manifest_df):
@@ -14,4 +14,7 @@ class YoloTrainer(Trainer):
         raise NotImplementedError
 
     def predict(self):
+        raise NotImplementedError
+
+    def log_model(self) -> str:
         raise NotImplementedError

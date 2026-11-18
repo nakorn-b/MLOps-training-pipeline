@@ -14,8 +14,13 @@ class Trainer(ABC):
     y_test: Sequence
 
     @abstractmethod
-    def load(self):
-        """Build the model and load its starting weights (pretrained or champion)."""
+    def load(self, model_uri: str | None = None):
+        """Build the model and load its starting weights.
+
+        `model_uri` None: fresh or pretrained weights. Otherwise an MLflow model
+        URI (e.g. `models:/<name>@champion`, `runs:/<run_id>/model`) to start from.
+        The caller resolves the URI; trainers never look up the registry.
+        """
 
     @abstractmethod
     def preprocess(self, manifest_df):
@@ -31,3 +36,11 @@ class Trainer(ABC):
     @abstractmethod
     def predict(self):
         """Predict class labels for the test split."""
+
+    @abstractmethod
+    def log_model(self) -> str:
+        """Log the trained model to the active MLflow run, in this model's flavor.
+
+        Returns the logged model's URI. Called by the register task inside an
+        open run, so the pipeline never needs to know the flavor.
+        """

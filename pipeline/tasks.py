@@ -89,11 +89,12 @@ def evaluate(trainer: Trainer):
 
 
 @task
-def register(cfg: Config, metrics: dict):
-    """Log the run's params and metrics to MLflow.
+def register(cfg: Config, metrics: dict, trainer: Trainer) -> str:
+    """Log the run's params, metrics and model to MLflow; return the model URI.
 
     Params are the experiment YAML, flattened (data.uri, model.name, params.*).
-    Model logging and champion promotion are not built yet.
+    The model is logged by trainer.log_model(), in that trainer's own flavor.
+    Champion promotion is not built yet.
     """
     params = pd.json_normalize(cfg.model_dump()).iloc[0].to_dict()
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
@@ -101,3 +102,4 @@ def register(cfg: Config, metrics: dict):
     with mlflow.start_run(run_name=cfg.model.name):
         mlflow.log_params(params)
         mlflow.log_metrics(metrics)
+        return trainer.log_model()

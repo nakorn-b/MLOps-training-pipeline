@@ -1,3 +1,4 @@
+import mlflow
 from pipeline.config import Config
 from sklearn.linear_model import LogisticRegression
 from trainers.base import Trainer
@@ -18,8 +19,11 @@ class LogisticRegressionTrainer(Trainer):
     def __init__(self, config: Config) -> None:
         self.config = config
 
-    def load(self):
-        self.model = LogisticRegression(**self.config.params)
+    def load(self, model_uri: str | None = None):
+        if model_uri is None:
+            self.model = LogisticRegression(**self.config.params)
+        else:
+            self.model = mlflow.sklearn.load_model(model_uri)
 
     def preprocess(self, manifest_df):
         self.X_train, self.y_train = load_split(manifest_df, "train")
@@ -30,3 +34,9 @@ class LogisticRegressionTrainer(Trainer):
 
     def predict(self):
         return self.model.predict(self.X_test)
+
+    def log_model(self) -> str:
+        info = mlflow.sklearn.log_model(
+            self.model, name="model", input_example=self.X_test[:1]
+        )
+        return info.model_uri

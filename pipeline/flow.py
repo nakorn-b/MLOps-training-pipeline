@@ -15,7 +15,7 @@ def train(config_path: str):
     tasks.preprocess(cfg.data.uri, trainer)
     tasks.train(trainer)
     metrics = tasks.evaluate(trainer)
-    tasks.register(cfg, metrics)
+    tasks.register(cfg, metrics, trainer)
     # TODO: wire once task arguments are decided
     # preprocess -> train -> evaluate -> register
 
