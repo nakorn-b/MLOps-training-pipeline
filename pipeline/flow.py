@@ -3,19 +3,26 @@ from prefect import flow
 
 from pipeline import tasks
 import pandas as pd
+import mlflow
+import os
 
 @flow
 def train(config_path: str):
     """Train from pretrained weights on the dataset named in the YAML.
 
     Gating: compare against the champion's logged metric.
+    Everything after load_config logs into one MLflow run, opened here.
     """
     cfg = tasks.load_config(config_path)
-    trainer = get_trainer(cfg.model.name, cfg) #TODO: chamge 2nd params to cfg.params
-    tasks.preprocess(cfg.data.uri, trainer)
-    tasks.train(trainer)
-    metrics = tasks.evaluate(trainer)
-    tasks.register(cfg, metrics, trainer)
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
+    mlflow.set_experiment(os.environ.get("EXPERIMENT_NAME", "MLOps-pipeline"))
+    with mlflow.start_run(run_name=cfg.model.name):
+        mlflow.log_params(pd.json_normalize(cfg.model_dump()).iloc[0].to_dict())
+        trainer = get_trainer(cfg)
+        tasks.preprocess(cfg.data.uri, trainer)
+        tasks.train(trainer)
+        metrics = tasks.evaluate(trainer)
+        tasks.register(metrics, trainer)   
     # TODO: wire once task arguments are decided
     # preprocess -> train -> evaluate -> register
 

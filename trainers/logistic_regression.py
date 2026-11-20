@@ -31,6 +31,7 @@ class LogisticRegressionTrainer(Trainer):
     
     def train(self):
         self.model.fit(self.X_train, self.y_train)
+        mlflow.log_metric("train_accuracy", self.model.score(self.X_train, self.y_train))
 
     def predict(self):
         return self.model.predict(self.X_test)

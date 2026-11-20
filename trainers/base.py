@@ -31,7 +31,11 @@ class Trainer(ABC):
 
     @abstractmethod
     def train(self):
-        """Train the model."""
+        """Train the model.
+
+        Runs inside the flow's active MLflow run, so it may log metrics
+        (e.g. per epoch) with mlflow.log_metric.
+        """
 
     @abstractmethod
     def predict(self):

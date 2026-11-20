@@ -32,6 +32,12 @@ row = runs.iloc[0]
 assert row['status'] == 'FINISHED', row['status']
 print(row.filter(regex='^(metrics|params)').to_string())
 
+# A metric logged from inside Trainer.train() must land in the same run as the
+# final metrics (the flow opens one run before training).
+import pandas as pd
+assert pd.notna(row.get('metrics.train_accuracy')), 'metric logged in Trainer.train() is not in the run'
+print('train-time metric in the same run OK')
+
 # The logged model must reload in the generic pyfunc flavor and predict.
 models = mlflow.search_logged_models(experiment_ids=[row['experiment_id']], output_format='list')
 assert len(models) == 1, f'expected 1 logged model, found {len(models)}'

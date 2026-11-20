@@ -5,8 +5,8 @@
       "name": "Open the MLflow run at the start of the flow",
       "description": "Today the MLflow run is opened inside the register task, after training has finished, so nothing can be logged while a model trains. Move tracking-URI/experiment setup and run creation to the start of the train flow so every task logs into one active run; trainers can then log per-epoch metrics (needed for YOLO and Hugging Face). Done when: register no longer calls mlflow.start_run, params are logged before training begins, and a metric logged from inside Trainer.train() appears in the same run as the final metrics.",
       "dependencies": [],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "2026-11-19: ./init.sh green (exit 0). The train flow (pipeline/flow.py) sets the tracking URI/experiment from env, then opens the run inline with `with mlflow.start_run(run_name=cfg.model.name):` and logs the flattened YAML params before any task runs; the with-block ends the run FINISHED, or FAILED on an exception (user's version, replaces the earlier tasks.start_run helper, now removed). register(metrics, trainer) (cfg dropped; agreed with user) no longer calls mlflow.start_run. get_trainer(config) now takes only the config and reads config.model.name (user change). LogisticRegressionTrainer.train() logs train_accuracy (0.961); init.sh asserts exactly 1 FINISHED run containing train_accuracy alongside accuracy 0.295 / f1 0.291, params, and the logged model (pyfunc and trainer.load reload OK). Not in scope: retrain flow (still a stub, opens no run)."
     },
     {
       "id": "feat-002",

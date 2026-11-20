@@ -3,11 +3,16 @@
 ## Current Objective
 
 - Goal: make the pipeline generalise beyond scikit-learn (YOLO / Hugging Face next)
-- Current status: feat-002 done; `./init.sh` green; no feature in progress
-- Branch / commit: `feature/load-config` @ e93a092 (all harness and feat-002 work uncommitted)
+- Current status: feat-001 and feat-002 done; `./init.sh` green; no feature in progress
+- Branch / commit: `feature/load-config` @ 0b2106d (feat-001 work uncommitted)
 
 ## Completed This Session
 
+- [x] feat-001: the train flow opens one MLflow run up front with an inline
+      `with mlflow.start_run(...)` in `pipeline/flow.py` (params logged before training);
+      `register(metrics, trainer)` logs into the active run; `get_trainer(config)` takes
+      only the config; `LogisticRegressionTrainer.train()` logs `train_accuracy`;
+      `init.sh` checks it lands in the same single run
 - [x] feat-002: `Trainer.load(model_uri=None)` and `Trainer.log_model() -> str`;
       `register` logs the model through the trainer; reload checks added to `init.sh`
 
@@ -20,6 +25,7 @@
 | End-to-end train flow | `./init.sh` | pass | accuracy 0.295, f1 0.291 |
 | Model reload (pyfunc) | `./init.sh` | pass | predicts on the logged input example |
 | `trainer.load(model_uri)` | `./init.sh` | pass | same prediction as pyfunc |
+| Train-time metric in same run (feat-001) | `./init.sh` | pass | 1 run; `train_accuracy` 0.961 next to final metrics |
 
 ## Files Changed
 
@@ -40,5 +46,5 @@
 
 ## Recommended Next Step
 
-- feat-001: open the MLflow run at the start of the `train` flow so trainers can log
-  per-epoch metrics; `register` then logs into the active run instead of opening one.
+- feat-003: lazy-import trainers in `model_factory` so the logistic regression run does
+  not import `trainers.yolo` / `trainers.dino`.

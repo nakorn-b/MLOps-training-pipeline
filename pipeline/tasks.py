@@ -1,7 +1,5 @@
 """Pipeline steps. Signatures are bare on purpose: arguments are not decided yet."""
 
-import os
-
 from dotenv import load_dotenv
 from prefect import task, get_run_logger
 
@@ -87,19 +85,10 @@ def evaluate(trainer: Trainer):
         "f1": float(f1),
     }
 
-
 @task
-def register(cfg: Config, metrics: dict, trainer: Trainer) -> str:
-    """Log the run's params, metrics and model to MLflow; return the model URI.
-
-    Params are the experiment YAML, flattened (data.uri, model.name, params.*).
-    The model is logged by trainer.log_model(), in that trainer's own flavor.
-    Champion promotion is not built yet.
+def register(metrics: dict, trainer: Trainer) -> str:
     """
-    params = pd.json_normalize(cfg.model_dump()).iloc[0].to_dict()
-    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
-    mlflow.set_experiment(os.environ.get("EXPERIMENT_NAME", "MLOps-pipeline"))
-    with mlflow.start_run(run_name=cfg.model.name):
-        mlflow.log_params(params)
-        mlflow.log_metrics(metrics)
-        return trainer.log_model()
+    Log the final metrics and the model to the active run; return the model URI.
+    """
+    mlflow.log_metrics(metrics)
+    return trainer.log_model()
