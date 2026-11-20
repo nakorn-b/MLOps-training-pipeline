@@ -79,10 +79,10 @@ def evaluate(trainer: Trainer):
     )
 
     return {
-        "accuracy": float(accuracy_score(y_true, y_pred)),
-        "precision": float(precision),
-        "recall": float(recall),
-        "f1": float(f1),
+        "test_accuracy": float(accuracy_score(y_true, y_pred)),
+        "test_precision": float(precision),
+        "test_recall": float(recall),
+        "test_f1": float(f1),
     }
 
 @task

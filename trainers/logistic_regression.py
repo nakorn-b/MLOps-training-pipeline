@@ -1,6 +1,7 @@
 import mlflow
 from pipeline.config import Config
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from trainers.base import Trainer
 import pandas as pd
 import numpy as np
@@ -31,7 +32,16 @@ class LogisticRegressionTrainer(Trainer):
     
     def train(self):
         self.model.fit(self.X_train, self.y_train)
-        mlflow.log_metric("train_accuracy", self.model.score(self.X_train, self.y_train))
+        y_pred = self.model.predict(self.X_train)
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            self.y_train, y_pred, average="macro", zero_division=0
+        )
+        mlflow.log_metrics({
+            "train_accuracy": float(accuracy_score(self.y_train, y_pred)),
+            "train_precision": float(precision),
+            "train_recall": float(recall),
+            "train_f1": float(f1),
+        })
 
     def predict(self):
         return self.model.predict(self.X_test)
