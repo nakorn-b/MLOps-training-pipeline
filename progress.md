@@ -17,6 +17,8 @@
       `with mlflow.start_run(...)` in `pipeline/flow.py`, params logged before training);
       trainers can log metrics during `train()`; `register(metrics, trainer)` logs into
       the active run
+- [x] feat-005: `evaluate` also returns `test_roc_auc` (macro OvR) and logs one-vs-rest
+      ROC curves as `roc_curve.png` to the active run; `init.sh` asserts both
 - [x] Harness initialised: `feature_list.json`, `progress.md`, `session-handoff.md`, `init.sh`
 
 ### What's In Progress
@@ -40,7 +42,11 @@
 
 - **Data arrives unsplit**: `preprocess` splits into a manifest, then calls `trainer.preprocess()`
 - **Hyperparameters are a free-form `params:` dict** in the YAML, validated by the trainer
-- **ROC/AUC removed for now** to keep the code simple; `predict_proba()` went with them
+- **ROC/AUC is back** (2026-11-20): `Trainer` has `classes: Sequence` (column order of
+  `predict_proba()`) and an abstract `predict_proba()` (no arguments, shape
+  (n_test, n_classes)). `evaluate` returns `test_roc_auc` (macro one-vs-rest
+  `roc_auc_score`) and logs one figure of per-class OvR ROC curves as `roc_curve.png`
+  to the active MLflow run. `predict()` is unchanged.
 - **`Trainer.load(model_uri=None)`** (agreed 2026-11-18): `None` = fresh/pretrained;
   otherwise an MLflow model URI. The caller resolves the champion URI, trainers never
   query the registry. `log_model()` takes no arguments and returns the model URI.

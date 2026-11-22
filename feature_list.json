@@ -33,6 +33,16 @@
       ],
       "status": "not-started",
       "evidence": ""
+    },
+    {
+      "id": "feat-005",
+      "name": "ROC/AUC in evaluate",
+      "description": "Make the evaluate task also score ROC/AUC on the test split and log the ROC plot. Trainer gains a `classes: Sequence` attribute (column order of predict_proba) and an abstract predict_proba() (no arguments, shape (n_test, n_classes)); evaluate stays model-agnostic and uses only y_test, classes, predict() and predict_proba(). Done when: evaluate returns test_roc_auc (macro one-vs-rest roc_auc_score), one matplotlib figure with a one-vs-rest ROC curve per class (legend with class name and AUC, chance diagonal, macro AUC in the title) is logged as roc_curve.png to the active run, and init.sh asserts both.",
+      "dependencies": [
+        "feat-001"
+      ],
+      "status": "done",
+      "evidence": "2026-11-20: `./init.sh` exit 0, end-to-end step ran (no SKIPPED). The single FINISHED run has metrics.test_roc_auc = 0.745722 (accuracy 0.295, f1 0.291 unchanged) and init.sh prints 'ROC OK: test_roc_auc=0.7457, roc_curve.png logged' after asserting roc_curve.png is in mlflow.artifacts.list_artifacts(run_id=...). PNG from a separate run downloaded and checked by eye: 10 labelled class curves (AUC 0.583 bird to 0.837 frog), dashed chance diagonal, legend in the lower right without covering the curves. matplotlib added with `uv add matplotlib`; the figure uses matplotlib.figure.Figure (no pyplot, headless-safe). Dino/Yolo predict_proba are NotImplementedError stubs."
     }
   ]
 }
