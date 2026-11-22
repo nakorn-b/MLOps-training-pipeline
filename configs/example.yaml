@@ -2,6 +2,7 @@ data:
   uri: data/cifar10-mini     # one subfolder per class
 model:
   name: logistic_regression  # key in model_factory.TRAINERS
+  registry_name: logistic_regression_cifar10
 params:                      # passed to the model; logged to MLflow as params.<key>
-  C: 1.0                     # inverse regularisation strength
+  C: 0.001                     # inverse regularisation strength
   max_iter: 200

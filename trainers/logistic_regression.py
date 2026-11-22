@@ -55,6 +55,8 @@ class LogisticRegressionTrainer(Trainer):
 
     def log_model(self) -> str:
         info = mlflow.sklearn.log_model(
-            self.model, name=self.config.model.name, input_example=self.X_test[:1]
+            self.model, 
+            name=self.config.model.name, 
+            input_example=self.X_test[:1],
         )
         return info.model_uri

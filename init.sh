@@ -49,7 +49,7 @@ print(f'pyfunc reload OK: {uri} -> {list(pred)}')
 # The trainer must be able to start from that logged model.
 from pipeline.config import Config
 from trainers.logistic_regression import LogisticRegressionTrainer
-t = LogisticRegressionTrainer(Config(data={'uri': ''}, model={'name': 'logistic_regression'}))
+t = LogisticRegressionTrainer(Config(data={'uri': ''}, model={'name': 'logistic_regression', 'registry_name': 'unused'}))
 t.load(uri)
 assert list(t.model.predict(example)) == list(pred)
 print('trainer.load(model_uri) OK')
@@ -59,6 +59,14 @@ assert pd.notna(row.get('metrics.test_roc_auc')), 'test_roc_auc missing from the
 artifacts = [a.path for a in mlflow.artifacts.list_artifacts(run_id=row['run_id'])]
 assert 'roc_curve.png' in artifacts, f'roc_curve.png not in run artifacts: {artifacts}'
 print(f\"ROC OK: test_roc_auc={row['metrics.test_roc_auc']:.4f}, roc_curve.png logged\")
+
+# First run on an empty registry: register creates the registered model and
+# makes this run's model version 1 the champion.
+import yaml
+registry_name = yaml.safe_load(open('configs/example.yaml'))['model']['registry_name']
+champ = mlflow.MlflowClient().get_model_version_by_alias(registry_name, 'champion')
+assert str(champ.version) == '1' and champ.run_id == row['run_id'], (champ.version, champ.run_id)
+print(f'registry OK: {registry_name} v{champ.version} is @champion')
 "
   rm -rf "$tmp"
 else
