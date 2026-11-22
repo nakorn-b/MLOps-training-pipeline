@@ -53,6 +53,12 @@ t = LogisticRegressionTrainer(Config(data={'uri': ''}, model={'name': 'logistic_
 t.load(uri)
 assert list(t.model.predict(example)) == list(pred)
 print('trainer.load(model_uri) OK')
+
+# evaluate must log macro OvR ROC AUC and the ROC curve plot to the same run.
+assert pd.notna(row.get('metrics.test_roc_auc')), 'test_roc_auc missing from the run'
+artifacts = [a.path for a in mlflow.artifacts.list_artifacts(run_id=row['run_id'])]
+assert 'roc_curve.png' in artifacts, f'roc_curve.png not in run artifacts: {artifacts}'
+print(f\"ROC OK: test_roc_auc={row['metrics.test_roc_auc']:.4f}, roc_curve.png logged\")
 "
   rm -rf "$tmp"
 else

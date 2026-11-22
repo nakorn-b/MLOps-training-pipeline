@@ -5,6 +5,7 @@ from pipeline import tasks
 import pandas as pd
 import mlflow
 import os
+from datetime import datetime
 
 @flow
 def train(config_path: str):
@@ -16,7 +17,8 @@ def train(config_path: str):
     cfg = tasks.load_config(config_path)
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
     mlflow.set_experiment(os.environ.get("EXPERIMENT_NAME", "MLOps-pipeline"))
-    with mlflow.start_run(run_name=cfg.model.name):
+    run_name = f"{cfg.model.name}-{datetime.now():%Y-%m-%d-%H:%M}"
+    with mlflow.start_run(run_name=run_name):
         mlflow.log_params(pd.json_normalize(cfg.model_dump()).iloc[0].to_dict())
         trainer = get_trainer(cfg)
         tasks.preprocess(cfg.data.uri, trainer)

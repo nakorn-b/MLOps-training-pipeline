@@ -97,13 +97,17 @@ configs/             one YAML per experiment
 | `preprocess(manifest_df)` | Prepare the split dataset for this model (resize, normalise, convert format). |
 | `train()` | Train. |
 | `predict()` | Predict class labels for the test split. |
+| `predict_proba()` | Predict class probabilities for the test split: shape (n_test, n_classes), columns in `classes` order. |
 | `log_model()` | Log the trained model to the active MLflow run in this model's flavor; return its model URI. Called by `register`. |
 
-Trainers also expose `y_test` (true test labels), which the `evaluate` task reads.
+Trainers also expose `y_test` (true test labels) and `classes` (class labels in
+the column order of `predict_proba()`), which the `evaluate` task reads.
 
 `evaluate()` is planned future work. Until then the `evaluate` task is generic
-pipeline code: it scores the test split and returns accuracy and
-macro-averaged precision, recall and F1.
+pipeline code: it scores the test split and returns accuracy,
+macro-averaged precision, recall and F1, and macro one-vs-rest ROC AUC
+(`test_roc_auc`); it also logs the per-class ROC curves as `roc_curve.png` to
+the active MLflow run.
 
 ## Flows
 
