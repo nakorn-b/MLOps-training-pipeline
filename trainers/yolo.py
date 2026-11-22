@@ -16,5 +16,8 @@ class YoloTrainer(Trainer):
     def predict(self):
         raise NotImplementedError
 
+    def predict_proba(self):
+        raise NotImplementedError
+
     def log_model(self) -> str:
         raise NotImplementedError

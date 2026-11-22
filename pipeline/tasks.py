@@ -8,8 +8,12 @@ import yaml
 from sklearn.metrics import (
     accuracy_score,
     precision_recall_fscore_support,
+    roc_auc_score,
+    roc_curve,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import label_binarize
+from matplotlib.figure import Figure
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -69,20 +73,44 @@ def evaluate(trainer: Trainer):
 
     Generic pipeline code until Trainer gets its own evaluate().
     Returns accuracy, precision, recall and f1; the last three are
-    macro-averaged over classes.
+    macro-averaged over classes. Also returns test_roc_auc (macro one-vs-rest)
+    and logs one-vs-rest ROC curves as roc_curve.png to the active MLflow run.
     """
     y_true = np.asarray(trainer.y_test)
     y_pred = np.asarray(trainer.predict())
+    classes = list(trainer.classes)
+    proba = np.asarray(trainer.predict_proba())
 
     precision, recall, f1, _ = precision_recall_fscore_support(
         y_true, y_pred, average="macro", zero_division=0
     )
+    roc_auc = float(roc_auc_score(
+        y_true, proba, multi_class="ovr", average="macro", labels=classes
+    ))
+
+    # One-vs-rest ROC curve per class. Figure (not pyplot) needs no GUI backend.
+    y_bin = label_binarize(y_true, classes=classes)
+    fig = Figure(figsize=(8, 7))
+    ax = fig.subplots()
+    for i, cls in enumerate(classes):
+        fpr, tpr, _ = roc_curve(y_bin[:, i], proba[:, i])
+        class_auc = roc_auc_score(y_bin[:, i], proba[:, i])
+        ax.plot(fpr, tpr, lw=1.5, label=f"{cls} (AUC = {class_auc:.3f})")
+    ax.plot([0, 1], [0, 1], "k--", lw=1, label="chance")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel("False positive rate")
+    ax.set_ylabel("True positive rate")
+    ax.set_title(f"One-vs-rest ROC curves (macro AUC = {roc_auc:.3f})")
+    ax.legend(loc="lower right", fontsize="small")
+    mlflow.log_figure(fig, "roc_curve.png")
 
     return {
         "test_accuracy": float(accuracy_score(y_true, y_pred)),
         "test_precision": float(precision),
         "test_recall": float(recall),
         "test_f1": float(f1),
+        "test_roc_auc": roc_auc,
     }
 
 @task

@@ -43,11 +43,18 @@ class LogisticRegressionTrainer(Trainer):
             "train_f1": float(f1),
         })
 
+    @property
+    def classes(self):
+        return self.model.classes_
+
     def predict(self):
         return self.model.predict(self.X_test)
 
+    def predict_proba(self):
+        return self.model.predict_proba(self.X_test)
+
     def log_model(self) -> str:
         info = mlflow.sklearn.log_model(
-            self.model, name="model", input_example=self.X_test[:1]
+            self.model, name=self.config.model.name, input_example=self.X_test[:1]
         )
         return info.model_uri

@@ -8,10 +8,12 @@ class Trainer(ABC):
     Future work: an abstract evaluate() so metrics become model-specific.
 
     The evaluate task also reads `y_test`, set by the trainer: the true labels
-    of the test split, in the same order as the predictions.
+    of the test split, in the same order as the predictions. It also reads
+    `classes`: the class labels in the column order of predict_proba().
     """
 
     y_test: Sequence
+    classes: Sequence
 
     @abstractmethod
     def load(self, model_uri: str | None = None):
@@ -40,6 +42,13 @@ class Trainer(ABC):
     @abstractmethod
     def predict(self):
         """Predict class labels for the test split."""
+
+    @abstractmethod
+    def predict_proba(self):
+        """Predict class probabilities for the test split.
+
+        Shape (n_test, n_classes), columns in `self.classes` order.
+        """
 
     @abstractmethod
     def log_model(self) -> str:
