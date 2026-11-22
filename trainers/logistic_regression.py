@@ -51,7 +51,7 @@ class LogisticRegressionTrainer(Trainer):
         return self.model.predict(self.X_test)
 
     def predict_proba(self):
-        return self.model.predict_proba(self.X_test)
+        return self.model.predict_proba(self.X_test) # sklearn method
 
     def log_model(self) -> str:
         info = mlflow.sklearn.log_model(
