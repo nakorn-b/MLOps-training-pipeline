@@ -23,6 +23,6 @@ deployments:
 
   # infra-specific fields
   work_pool:
-    name: null
+    name: mlops-pipeline
     work_queue_name: null
     job_variables: {}

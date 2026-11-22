@@ -1,0 +1,48 @@
+{
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "Open the MLflow run at the start of the flow",
+      "description": "Today the MLflow run is opened inside the register task, after training has finished, so nothing can be logged while a model trains. Move tracking-URI/experiment setup and run creation to the start of the train flow so every task logs into one active run; trainers can then log per-epoch metrics (needed for YOLO and Hugging Face). Done when: register no longer calls mlflow.start_run, params are logged before training begins, and a metric logged from inside Trainer.train() appears in the same run as the final metrics.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "2026-11-19: ./init.sh green (exit 0). The train flow (pipeline/flow.py) sets the tracking URI/experiment from env, then opens the run inline with `with mlflow.start_run(run_name=cfg.model.name):` and logs the flattened YAML params before any task runs; the with-block ends the run FINISHED, or FAILED on an exception (user's version, replaces the earlier tasks.start_run helper, now removed). register(metrics, trainer) (cfg dropped; agreed with user) no longer calls mlflow.start_run. get_trainer(config) now takes only the config and reads config.model.name (user change). LogisticRegressionTrainer.train() logs train_accuracy (0.961); init.sh asserts exactly 1 FINISHED run containing train_accuracy alongside accuracy 0.295 / f1 0.291, params, and the logged model (pyfunc and trainer.load reload OK). Not in scope: retrain flow (still a stub, opens no run)."
+    },
+    {
+      "id": "feat-002",
+      "name": "Model saving and champion loading behind the Trainer interface",
+      "description": "Nothing saves or loads a model yet, and the MLflow flavor differs per model (sklearn, transformers, custom pyfunc for YOLO). Add an abstract Trainer.log_model() that logs the trained model to the active run in its own flavor; register calls it without knowing the flavor (inside the run register opens today; inside the flow-level run once feat-001 lands). Extend Trainer.load() so it can start from the current MLflow champion instead of fresh/pretrained weights (prerequisite for the retrain flow). Ask the user before fixing the method signatures (CLAUDE.md rule). Done when: a train run stores a model artifact, it reloads with mlflow.pyfunc.load_model and predicts, and LogisticRegressionTrainer can load() from a logged model.",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "2026-11-18: ./init.sh green. Train flow on data/cifar10-mini logged run (accuracy 0.295, f1 0.291) plus model models:/m-85297726798f49648c87c52ef475d424 via LogisticRegressionTrainer.log_model() (sklearn flavor) called from register; it reloads with mlflow.pyfunc.load_model and predicts ('dog' on its input example); LogisticRegressionTrainer.load(model_uri) loads it and gives the same prediction. Both reload checks are now part of init.sh. Signature agreed with user: load(model_uri: str | None = None); the caller resolves the URI (e.g. models:/<name>@champion), trainers never query the registry. Not in scope: champion alias/promotion and the retrain flow."
+    },
+    {
+      "id": "feat-003",
+      "name": "Lazy-import trainers in model_factory",
+      "description": "model_factory.py imports every Trainer class up front, so once YOLO and DINO are real, running logistic regression will import torch/ultralytics/transformers and fail if they are not installed. Make TRAINERS map names to import paths (or otherwise defer the import) so get_trainer imports only the requested trainer's module. Keep the existing behavior: classes not instances, unknown name raises an error listing valid names. Done when: running the logistic_regression config does not import trainers.yolo or trainers.dino (check sys.modules), and an unknown name still raises the listing error.",
+      "dependencies": [],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-004",
+      "name": "Tasks pass artifacts instead of sharing the in-memory trainer",
+      "description": "preprocess and train return nothing useful; they mutate the trainer object and the next task reads it. That only works in one process and defeats Prefect task retries, caching and distributed task runners. Change the hand-offs to artifacts: preprocess returns a manifest path, train returns a checkpoint/model URI, evaluate rebuilds what it needs from those. This is the largest change; do it last and ask the user before fixing task signatures (CLAUDE.md rule). Done when: each task's inputs and outputs are paths/URIs or plain data (no live model object crosses a task boundary), and evaluate works on a trainer constructed fresh from the artifacts.",
+      "dependencies": [
+        "feat-002"
+      ],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-005",
+      "name": "ROC/AUC in evaluate",
+      "description": "Make the evaluate task also score ROC/AUC on the test split and log the ROC plot. Trainer gains a `classes: Sequence` attribute (column order of predict_proba) and an abstract predict_proba() (no arguments, shape (n_test, n_classes)); evaluate stays model-agnostic and uses only y_test, classes, predict() and predict_proba(). Done when: evaluate returns test_roc_auc (macro one-vs-rest roc_auc_score), one matplotlib figure with a one-vs-rest ROC curve per class (legend with class name and AUC, chance diagonal, macro AUC in the title) is logged as roc_curve.png to the active run, and init.sh asserts both.",
+      "dependencies": [
+        "feat-001"
+      ],
+      "status": "done",
+      "evidence": "2026-11-20: `./init.sh` exit 0, end-to-end step ran (no SKIPPED). The single FINISHED run has metrics.test_roc_auc = 0.745722 (accuracy 0.295, f1 0.291 unchanged) and init.sh prints 'ROC OK: test_roc_auc=0.7457, roc_curve.png logged' after asserting roc_curve.png is in mlflow.artifacts.list_artifacts(run_id=...). PNG from a separate run downloaded and checked by eye: 10 labelled class curves (AUC 0.583 bird to 0.837 frog), dashed chance diagonal, legend in the lower right without covering the curves. matplotlib added with `uv add matplotlib`; the figure uses matplotlib.figure.Figure (no pyplot, headless-safe). Dino/Yolo predict_proba are NotImplementedError stubs."
+    }
+  ]
+}
