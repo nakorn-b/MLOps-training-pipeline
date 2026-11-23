@@ -1,0 +1,83 @@
+# MLflow (backed by Postgres), Prefect server, and a Prefect worker.
+#   docker compose up -d --build
+# MLflow UI/API:  http://localhost:5001  (from the host: MLFLOW_TRACKING_URI=http://localhost:5001)
+# Prefect UI/API: http://localhost:4200  (from the host: PREFECT_API_URL=http://localhost:4200/api)
+name: mlops-pipeline
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mlflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlflow}
+      POSTGRES_DB: ${POSTGRES_DB:-mlflow}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mlflow:
+    # The project image (Dockerfile): MLflow and psycopg versions come from uv.lock.
+    build: .
+    container_name: mlflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5001:5000"
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    # Runs, params, metrics and the model registry go to Postgres. Artifacts
+    # (models, roc_curve.png) are uploaded through the server and stored in
+    # the mlflow-artifacts volume, so clients never need a shared filesystem.
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql+psycopg://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/${POSTGRES_DB:-mlflow}
+      --artifacts-destination /mlflow/artifacts
+      --allowed-hosts localhost:*,127.0.0.1:*,mlflow:*
+    restart: unless-stopped
+
+  prefect-server:
+    image: prefecthq/prefect:3.9.2-python3.13
+    command: prefect server start --host 0.0.0.0
+    environment:
+      # The UI runs in your browser, so it must call the API via localhost.
+      PREFECT_UI_API_URL: http://localhost:4200/api
+    ports:
+      - "4200:4200"
+    volumes:
+      - prefect-data:/root/.prefect  # flow runs, deployments, work pools (SQLite)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  prefect-worker:
+    build: .
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    # The project, including configs/ and data/, at the path prefect.yaml's
+    # pull step points to. The image's venv lives in /opt/venv, not here.
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  mlflow-artifacts:
+  prefect-data:
