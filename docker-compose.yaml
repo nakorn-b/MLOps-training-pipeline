@@ -31,6 +31,11 @@ services:
         condition: service_healthy
     ports:
       - "5001:5000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mlflow.rule=PathPrefix(`/mlflow`)"
+      - "traefik.http.routers.mlflow.entrypoints=web"
+      - "traefik.http.services.mlflow.loadbalancer.server.port=5000"
     # Runs, params, metrics and the model registry go to Postgres. Artifacts
     # (models, roc_curve.png) are uploaded through the server and stored in
     # the mlflow-artifacts volume, so clients never need a shared filesystem.
@@ -38,30 +43,39 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
       AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
+    # "--allowed-hosts locahost" because that's how the traefik header is. 
+    # We must allows this header for traefik to send request (browser -> traefik -> mlflow service)
     command: >
       mlflow server
       --host 0.0.0.0
       --port 5000
       --backend-store-uri postgresql+psycopg://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/${POSTGRES_DB:-mlflow}
       --artifacts-destination s3://mlflow-artifacts
-      --allowed-hosts localhost:*,127.0.0.1:*,mlflow:*
+      --static-prefix /mlflow
+      --allowed-hosts localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow:*
     restart: unless-stopped
 
   prefect-server:
     image: prefecthq/prefect:3.9.2-python3.13
     command: prefect server start --host 0.0.0.0
     environment:
-      # The UI runs in your browser, so it must call the API via localhost.
-      PREFECT_UI_API_URL: http://localhost:4200/api
+      PREFECT_UI_SERVE_BASE: /prefect
+      PREFECT_UI_API_URL: http://localhost/prefect/api
+      PREFECT_SERVER_API_BASE_PATH: /prefect/api
     ports:
       - "4200:4200"
     volumes:
       - prefect-data:/root/.prefect  # flow runs, deployments, work pools (SQLite)
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/prefect/api/health')"]
       interval: 5s
       timeout: 5s
       retries: 20
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prefect.rule=PathPrefix(`/prefect`)"
+      - "traefik.http.routers.prefect.entrypoints=web"
+      - "traefik.http.services.prefect.loadbalancer.server.port=4200"
     restart: unless-stopped
 
   prefect-worker:
@@ -72,8 +86,8 @@ services:
       mlflow:
         condition: service_started
     environment:
-      PREFECT_API_URL: http://prefect-server:4200/api
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PREFECT_API_URL: http://prefect-server:4200/prefect/api
+      MLFLOW_TRACKING_URI: http://mlflow:5000/mlflow # Caused by --static-prefix of mlflow service command
       MLFLOW_DISABLE_AGENT_HINT: "1"
     # The project, including configs/ and data/, at the path prefect.yaml's
     # pull step points to. The image's venv lives in /opt/venv, not here.
@@ -108,13 +122,31 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    labels:
+      - "traefik.enable=true"
+      # Own hostname, not a path: the console sends S3 calls (login, /<bucket>/...) to "/" on the same origin.
+      - "traefik.http.routers.rustfs.rule=Host(`rustfs.localhost`)" # http://rustfs.localhost -> http://localhost:9001
+      - "traefik.http.routers.rustfs.entrypoints=web"
+      - "traefik.http.services.rustfs.loadbalancer.server.port=9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]  # S3 API port; Traefik's /rustfs prefix doesn't apply here
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
-
+  traefik:
+    image: traefik:v3.8
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"  # only route containers labelled traefik.enable=true
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   postgres-data:
