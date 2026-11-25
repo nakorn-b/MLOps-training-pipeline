@@ -1,0 +1,9 @@
+data:
+  uri: data/cifar10-mini-v2    
+model:
+  name: logistic_regression
+  registry_name: logistic_regression_cifar10
+  uri: models:/logistic_regression_cifar10@champion  # model to fine-tune; --model-uri overrides
+params:                      
+  C: 0.001
+  max_iter: 200

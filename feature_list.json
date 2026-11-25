@@ -43,6 +43,27 @@
       ],
       "status": "done",
       "evidence": "2026-11-20: `./init.sh` exit 0, end-to-end step ran (no SKIPPED). The single FINISHED run has metrics.test_roc_auc = 0.745722 (accuracy 0.295, f1 0.291 unchanged) and init.sh prints 'ROC OK: test_roc_auc=0.7457, roc_curve.png logged' after asserting roc_curve.png is in mlflow.artifacts.list_artifacts(run_id=...). PNG from a separate run downloaded and checked by eye: 10 labelled class curves (AUC 0.583 bird to 0.837 frog), dashed chance diagonal, legend in the lower right without covering the curves. matplotlib added with `uv add matplotlib`; the figure uses matplotlib.figure.Figure (no pyplot, headless-safe). Dino/Yolo predict_proba are NotImplementedError stubs."
+    },
+    {
+      "id": "feat-006",
+      "name": "Retrain fine-tunes any model given by URI",
+      "description": "The retrain flow used to mean 'fine-tune the current champion'. It now fine-tunes any MLflow model: the URI comes from model.uri in the YAML (ModelConfig.uri, optional) or from the model_uri flow parameter / `main.py --retrain --model-uri`, and the CLI/flow parameter overrides the YAML (dataset_uri overrides data.uri the same way). If neither is set, retrain raises before opening an MLflow run. Overrides are applied to cfg before params are logged, so the run's params show what actually ran. tasks.train(trainer, model_uri=None) passes the URI to Trainer.load(); trainers make load(model_uri) a real fine-tune start (LogisticRegressionTrainer sets warm_start=True and applies the YAML params). Done when: retrain without any model URI fails with a clear error and opens no run; retrain with --model-uri models:/<registry_name>/1 finishes, logs params.model.uri, and registers a new version; init.sh asserts all three.",
+      "dependencies": [
+        "feat-001",
+        "feat-002"
+      ],
+      "status": "done",
+      "evidence": "2026-11-25: `./init.sh` exit 0, end-to-end steps ran (no SKIPPED). Train run registered logistic_regression_cifar10 v1 @champion (test_f1 0.3028). `main.py --config configs/train.yaml --retrain` (no model.uri, no --model-uri) exited non-zero with 'retrain needs a model to fine-tune' and opened no run (run count stayed 1). `--retrain --model-uri models:/logistic_regression_cifar10/1` finished as run retrain-logistic_regression-2026-11-25-18:23:42 with params.model.uri = models:/logistic_regression_cifar10/1 and registered v2 from that run. Warm start checked separately: after load(uri) and fit with max_iter=1 the coefficients stay at the loaded model's (max abs diff 0.0000) while a fresh max_iter=1 fit differs by 1.126. init.sh also updated for the configs/example.yaml -> configs/train.yaml rename."
+    },
+    {
+      "id": "feat-007",
+      "name": "Retrain gating on the new test split",
+      "description": "register() promotes a new version only if its test_f1 beats the champion's logged test_f1. For train that is fair, but after retraining on a new dataset the champion's logged metric was measured on a different (old) test split, so the comparison is invalid. In the retrain flow, also score the current champion on the same new test split and gate on that. Note the base model (model.uri) may not be the champion. Ask the user before changing task signatures (CLAUDE.md rule), e.g. how evaluate scores a second model and how register receives the champion's score. Done when: on a retrain with a dataset whose test split differs from the champion's, promotion is decided by the champion's and the new model's test_f1 on that same split, and init.sh asserts it.",
+      "dependencies": [
+        "feat-006"
+      ],
+      "status": "not-started",
+      "evidence": ""
     }
   ]
 }

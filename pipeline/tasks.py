@@ -63,9 +63,13 @@ def preprocess(data_uri: str, trainer: Trainer) -> pd.DataFrame:
     return manifest_df
 
 @task
-def train(trainer: Trainer):
-    """Call trainer.load() then trainer.train()."""
-    trainer.load()
+def train(trainer: Trainer, model_uri: str | None = None):
+    """Call trainer.load(model_uri) then trainer.train().
+
+    `model_uri` None: fresh/pretrained weights (train flow). Otherwise the
+    MLflow model to fine-tune from (retrain flow).
+    """
+    trainer.load(model_uri)
     trainer.train()
 
 @task

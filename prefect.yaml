@@ -30,3 +30,18 @@ deployments:
     name: mlops-pipeline
     work_queue_name: null
     job_variables: {}
+- # base metadata
+  name: retrain_pipeline
+  version: null
+  tags: ["retrain"]
+  description: null
+
+  # flow-specific fields
+  entrypoint: pipeline/flow.py:retrain
+  parameters: {}
+
+  # infra-specific fields
+  work_pool:
+    name: mlops-pipeline
+    work_queue_name: null
+    job_variables: {}

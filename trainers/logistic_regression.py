@@ -24,7 +24,11 @@ class LogisticRegressionTrainer(Trainer):
         if model_uri is None:
             self.model = LogisticRegression(**self.config.params)
         else:
+            # Fine-tune: fit() normally discards the loaded coefficients and starts
+            # from zero; warm_start=True makes it start from them instead. The YAML
+            # params apply to the fine-tuning run, matching what MLflow logs.
             self.model = mlflow.sklearn.load_model(model_uri)
+            self.model.set_params(**self.config.params, warm_start=True)
 
     def preprocess(self, manifest_df):
         self.X_train, self.y_train = load_split(manifest_df, "train")

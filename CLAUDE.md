@@ -40,9 +40,10 @@ Before ending: update `feature_list.json` and `progress.md` (and
 ## Commands
 
 ```bash
-uv run main.py --config configs/example.yaml                              # train
-uv run main.py --config configs/example.yaml --retrain                    # retrain
-uv run main.py --config configs/example.yaml --retrain --dataset-uri <uri>
+uv run main.py --config configs/train.yaml                                # train
+uv run main.py --config configs/retrain.yaml --retrain                    # fine-tune model.uri from the YAML
+uv run main.py --config configs/retrain.yaml --retrain --model-uri <uri>  # fine-tune <uri> instead
+uv run main.py --config configs/retrain.yaml --retrain --dataset-uri <uri>
 ```
 
 Use `uv` for everything (`uv add <pkg>`, `uv run ...`). Python 3.13.
@@ -75,7 +76,12 @@ configs/             one YAML per experiment
   `EXPERIMENT_NAME` (fallback `MLOps-pipeline`). Both are set in `.env`, which
   `pipeline/tasks.py` loads on import.
 - **Config is typed.** `load_config` returns a pydantic `Config`, so bad YAML
-  fails before training starts. The data location is `data.uri`.
+  fails before training starts. The data location is `data.uri`. Retrain only:
+  `model.uri` is the MLflow model to fine-tune (optional in the schema; the
+  train flow ignores it).
+- **CLI / flow parameters override the YAML** for retrain: `--model-uri`
+  overrides `model.uri`, `--dataset-uri` overrides `data.uri`. Overrides are
+  applied to the `Config` before params are logged, so MLflow shows what ran.
 - **Hyperparameters live under `params:`** in the YAML as a free-form dict,
   because the keys are model-specific. The trainer passes them to its model and
   validates them. `register` logs the whole YAML to MLflow as flattened params
@@ -93,7 +99,7 @@ configs/             one YAML per experiment
 
 | Method | Meaning |
 |---|---|
-| `load(model_uri=None)` | Build the model. `None`: fresh/pretrained weights; otherwise start from that MLflow model URI (the flow resolves it, e.g. the champion). Not data loading. |
+| `load(model_uri=None)` | Build the model. `None`: fresh/pretrained weights; otherwise start from that MLflow model URI (any model: a registry version, `@champion`, a run's model; the flow resolves it). Must make the following `train()` a real fine-tune from those weights (e.g. sklearn `warm_start=True`). Not data loading. |
 | `preprocess(manifest_df)` | Prepare the split dataset for this model (resize, normalise, convert format). |
 | `train()` | Train. |
 | `predict()` | Predict class labels for the test split. |
@@ -113,18 +119,19 @@ the active MLflow run.
 
 Both flows run the same tasks: `load_config -> preprocess -> train -> evaluate -> register`.
 
-| | `train(config_path)` | `retrain(config_path, dataset_uri=None)` |
+| | `train(config_path)` | `retrain(config_path, model_uri=None, dataset_uri=None)` |
 |---|---|---|
-| Starting weights | pretrained | current MLflow champion; error if none exists |
+| Starting weights | pretrained | any MLflow model: `model_uri` if given, else `model.uri` from the YAML; error before any work if neither is set |
 | Data | `data.uri` from the YAML | `dataset_uri` if given, else the YAML |
-| Champion comparison | against the champion's logged metric | champion and new model both scored on the new test split |
+| Champion comparison | against the champion's logged metric | today: same as train. Planned (feat-007): champion and new model both scored on the new test split |
 
 `register` always logs the run to MLflow but promotes the model only when it
-beats the champion.
+beats the champion. The model retrain starts from is not necessarily the
+champion; promotion is always against the current champion.
 
-Automated retraining keeps the YAML fixed and passes new data through
-`dataset_uri`. Triggers (schedule, new data, drift) are not built yet; they
-will be Prefect deployments.
+Automated retraining keeps the YAML fixed and passes the model and new data
+through `model_uri` / `dataset_uri` (Prefect deployment parameters). Triggers
+(schedule, new data, drift) are not built yet; they will be Prefect deployments.
 
 ## Intended stack (not installed yet)
 
