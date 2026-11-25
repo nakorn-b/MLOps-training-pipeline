@@ -59,17 +59,23 @@ services:
     image: prefecthq/prefect:3.9.2-python3.13
     command: prefect server start --host 0.0.0.0
     environment:
-      # The UI runs in your browser, so it must call the API via localhost.
-      PREFECT_UI_API_URL: http://localhost:4200/api
+      PREFECT_UI_SERVE_BASE: /prefect
+      PREFECT_UI_API_URL: http://localhost/prefect/api
+      PREFECT_SERVER_API_BASE_PATH: /prefect/api
     ports:
       - "4200:4200"
     volumes:
       - prefect-data:/root/.prefect  # flow runs, deployments, work pools (SQLite)
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/prefect/api/health')"]
       interval: 5s
       timeout: 5s
       retries: 20
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prefect.rule=PathPrefix(`/prefect`)"
+      - "traefik.http.routers.prefect.entrypoints=web"
+      - "traefik.http.services.prefect.loadbalancer.server.port=4200"
     restart: unless-stopped
 
   prefect-worker:
@@ -80,7 +86,7 @@ services:
       mlflow:
         condition: service_started
     environment:
-      PREFECT_API_URL: http://prefect-server:4200/api
+      PREFECT_API_URL: http://prefect-server:4200/prefect/api
       MLFLOW_TRACKING_URI: http://mlflow:5000/mlflow # Caused by --static-prefix of mlflow service command
       MLFLOW_DISABLE_AGENT_HINT: "1"
     # The project, including configs/ and data/, at the path prefect.yaml's
@@ -128,6 +134,7 @@ services:
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"  # only route containers labelled traefik.enable=true
       - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
