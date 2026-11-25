@@ -10,6 +10,9 @@ class DataConfig(BaseModel):
 class ModelConfig(BaseModel):
     name: str  # key in model_factory.TRAINERS
     registry_name: str  # MLflow registered model that holds this experiment's versions
+    # Retrain only: MLflow model URI to fine-tune from, e.g. models:/<registry_name>/3
+    # or models:/<registry_name>@champion. The --model-uri CLI flag overrides it.
+    uri: str | None = None
 
 
 class Config(BaseModel):
