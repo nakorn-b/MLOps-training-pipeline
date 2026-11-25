@@ -7,7 +7,11 @@ build: null
 push: null
 
 # runtime steps
-pull: null
+# The worker container (docker-compose.yaml) mounts the project at /app.
+# Without this, `prefect deploy` would record this machine's absolute path.
+pull:
+- prefect.deployments.steps.set_working_directory:
+    directory: /app
 
 # deployment configurations
 deployments:

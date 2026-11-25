@@ -1,0 +1,9 @@
+# Build context for docker/worker.Dockerfile is the repo root; the image only
+# copies pyproject.toml and uv.lock, so keep everything heavy out of the context.
+.venv
+data
+mlruns
+mlflow.db
+__pycache__
+.git
+*.ipynb
