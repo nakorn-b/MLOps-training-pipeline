@@ -43,6 +43,8 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
       AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
+    # "--allowed-hosts locahost" because that's how the traefik header is. 
+    # We must allows this header for traefik to send request (browser -> traefik -> mlflow service)
     command: >
       mlflow server
       --host 0.0.0.0
@@ -50,7 +52,7 @@ services:
       --backend-store-uri postgresql+psycopg://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/${POSTGRES_DB:-mlflow}
       --artifacts-destination s3://mlflow-artifacts
       --static-prefix /mlflow
-      --allowed-hosts localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow:* # --allowed-hosts locahost because that's how the traefik header is. We must allows this header for traefik to send request (browser -> traefik -> mlflow service)
+      --allowed-hosts localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow:*
     restart: unless-stopped
 
   prefect-server:
