@@ -122,8 +122,14 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    labels:
+      - "traefik.enable=true"
+      # Own hostname, not a path: the console sends S3 calls (login, /<bucket>/...) to "/" on the same origin.
+      - "traefik.http.routers.rustfs.rule=Host(`rustfs.localhost`)" # http://rustfs.localhost -> http://localhost:9001
+      - "traefik.http.routers.rustfs.entrypoints=web"
+      - "traefik.http.services.rustfs.loadbalancer.server.port=9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]  # S3 API port; Traefik's /rustfs prefix doesn't apply here
       interval: 5s
       timeout: 5s
       retries: 10
