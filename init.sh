@@ -14,14 +14,14 @@ MLFLOW_DISABLE_AGENT_HINT=1 uv run python -c "import main, model_factory, pipeli
 # End-to-end train flow. Uses a temporary Prefect server and a throwaway MLflow
 # database, so it needs neither start.sh nor touches mlflow.db.
 if [ -d data/cifar10-mini ]; then
-  echo "=== end-to-end train flow (configs/example.yaml) ==="
+  echo "=== end-to-end train flow (configs/train.yaml) ==="
   tmp=$(mktemp -d)
   PREFECT_API_URL= \
   PREFECT_SERVER_ALLOW_EPHEMERAL_MODE=true \
   PREFECT_LOGGING_LEVEL=WARNING \
   MLFLOW_DISABLE_AGENT_HINT=1 \
   MLFLOW_TRACKING_URI="sqlite:///$tmp/mlflow.db" \
-    uv run main.py --config configs/example.yaml
+    uv run main.py --config configs/train.yaml
 
   echo "=== MLflow run was logged ==="
   MLFLOW_DISABLE_AGENT_HINT=1 MLFLOW_TRACKING_URI="sqlite:///$tmp/mlflow.db" uv run python -c "
@@ -63,10 +63,46 @@ print(f\"ROC OK: test_roc_auc={row['metrics.test_roc_auc']:.4f}, roc_curve.png l
 # First run on an empty registry: register creates the registered model and
 # makes this run's model version 1 the champion.
 import yaml
-registry_name = yaml.safe_load(open('configs/example.yaml'))['model']['registry_name']
+registry_name = yaml.safe_load(open('configs/train.yaml'))['model']['registry_name']
 champ = mlflow.MlflowClient().get_model_version_by_alias(registry_name, 'champion')
 assert str(champ.version) == '1' and champ.run_id == row['run_id'], (champ.version, champ.run_id)
 print(f'registry OK: {registry_name} v{champ.version} is @champion')
+"
+
+  # Retrain fine-tunes any model given by URI. train.yaml has no model.uri, so
+  # without --model-uri the flow must refuse before doing any work...
+  echo "=== retrain without a model URI fails ==="
+  registry_name=$(uv run python -c "import yaml; print(yaml.safe_load(open('configs/train.yaml'))['model']['registry_name'])")
+  if out=$(PREFECT_API_URL= PREFECT_SERVER_ALLOW_EPHEMERAL_MODE=true PREFECT_LOGGING_LEVEL=WARNING \
+      MLFLOW_DISABLE_AGENT_HINT=1 MLFLOW_TRACKING_URI="sqlite:///$tmp/mlflow.db" \
+      uv run main.py --config configs/train.yaml --retrain 2>&1); then
+    echo "FAIL: retrain without model.uri / --model-uri succeeded"; exit 1
+  fi
+  echo "$out" | grep -q "retrain needs a model to fine-tune" || { echo "$out" | tail -5; echo "FAIL: wrong error"; exit 1; }
+  echo "missing model URI rejected OK"
+
+  # ...and with --model-uri it fine-tunes version 1 into a new run and version.
+  echo "=== end-to-end retrain flow (--model-uri models:/$registry_name/1) ==="
+  PREFECT_API_URL= \
+  PREFECT_SERVER_ALLOW_EPHEMERAL_MODE=true \
+  PREFECT_LOGGING_LEVEL=WARNING \
+  MLFLOW_DISABLE_AGENT_HINT=1 \
+  MLFLOW_TRACKING_URI="sqlite:///$tmp/mlflow.db" \
+    uv run main.py --config configs/train.yaml --retrain --model-uri "models:/$registry_name/1"
+
+  MLFLOW_DISABLE_AGENT_HINT=1 MLFLOW_TRACKING_URI="sqlite:///$tmp/mlflow.db" uv run python -c "
+import mlflow
+registry_name = '$registry_name'
+# The failed attempt opened no run, so there are exactly train + retrain.
+runs = mlflow.search_runs(search_all_experiments=True, order_by=['start_time DESC'])
+assert len(runs) == 2, f'expected 2 runs (train + retrain), found {len(runs)}'
+row = runs.iloc[0]
+assert row['tags.mlflow.runName'].startswith('retrain-'), row['tags.mlflow.runName']
+assert row['status'] == 'FINISHED', row['status']
+assert row['params.model.uri'] == f'models:/{registry_name}/1', row['params.model.uri']
+v2 = mlflow.MlflowClient().get_model_version(registry_name, '2')
+assert v2.run_id == row['run_id'], (v2.run_id, row['run_id'])
+print(f\"retrain OK: run {row['tags.mlflow.runName']} fine-tuned {row['params.model.uri']} -> {registry_name} v2 (test_f1 {row['metrics.test_f1']:.4f})\")
 "
   rm -rf "$tmp"
 else

@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Last Updated:** 2026-11-18
-**Branch:** feature/load-config
-**Active Feature:** none (feat-001 and feat-002 done; next is feat-003)
+**Last Updated:** 2026-11-25
+**Branch:** see `git branch` (feature branches merged via PRs)
+**Active Feature:** none (feat-006 done; next is feat-007, then feat-003)
 
 ## Status
 
@@ -19,6 +19,13 @@
       the active run
 - [x] feat-005: `evaluate` also returns `test_roc_auc` (macro OvR) and logs one-vs-rest
       ROC curves as `roc_curve.png` to the active run; `init.sh` asserts both
+- [x] Champion gating in `register`: every run registers a version under `model.registry_name`;
+      the new version becomes `@champion` only if its `test_f1` beats the champion's
+      (with no champion, all versions are compared and the best is crowned)
+- [x] feat-006: `retrain` fine-tunes **any** MLflow model, not only the champion. The URI
+      comes from `model.uri` in the YAML or `--model-uri` / the `model_uri` flow parameter
+      (parameter wins); neither set -> error before any run opens.
+      `LogisticRegressionTrainer.load(uri)` uses `warm_start=True` so it is a real fine-tune
 - [x] Harness initialised: `feature_list.json`, `progress.md`, `session-handoff.md`, `init.sh`
 
 ### What's In Progress
@@ -27,15 +34,17 @@
 
 ### What's Next
 
-1. feat-003: lazy-import trainers in `model_factory`
-2. feat-004: tasks pass artifacts (largest change, last)
+1. feat-007: retrain gating on the new test split (score the champion on the same split)
+2. feat-003: lazy-import trainers in `model_factory`
+3. feat-004: tasks pass artifacts (largest change, last)
 
 ## Blockers / Risks
 
 - [ ] `data/` is gitignored, so a clean checkout has no `data/cifar10-mini`; `init.sh`
       then skips the end-to-end step and only checks imports
-- [ ] The `retrain` flow is still a stub (`NotImplementedError`); champion alias and
-      promotion are not built
+- [ ] Retrain gating compares against the champion's *logged* `test_f1`, measured on the
+      champion's own test split; after retraining on new data that comparison is invalid
+      (feat-007)
 - [ ] `DinoTrainer` / `YoloTrainer` `log_model()` and `load()` are stubs
 
 ## Decisions Made
@@ -58,6 +67,11 @@
   longer takes `cfg`. The first version's `tasks.start_run` helper was removed.
 - **`get_trainer(config)`** (2026-11-19, user change): takes only the config and reads
   `config.model.name`.
+- **Retrain fine-tunes any model by URI** (2026-11-25, user decision): `model.uri` in the
+  YAML (`ModelConfig.uri`, optional) and `--model-uri` / `retrain(config_path,
+  model_uri=None, dataset_uri=None)`; CLI/flow parameter overrides YAML; neither -> error.
+  Overrides are applied to `cfg` before params are logged. `tasks.train(trainer,
+  model_uri=None)` passes it to `Trainer.load()`.
 - **Let the second model drive interface changes**: implement YOLO/HF and fix what it
   exposes, in the order of `feature_list.json`, instead of redesigning up front
 
@@ -67,6 +81,9 @@
       the model reloads via `mlflow.pyfunc.load_model` and via `trainer.load(model_uri)`
 - [x] feat-001 `./init.sh` green on 2026-11-19: exactly 1 FINISHED run holds params,
       `train_accuracy` (logged inside `train()`), the final metrics and the model
+
+- [x] feat-006 `./init.sh` green on 2026-11-25: retrain without a URI fails with no run
+      opened; `--model-uri models:/<registry>/1` finishes, logs `params.model.uri`, registers v2
 
 ## Notes for Next Session
 
