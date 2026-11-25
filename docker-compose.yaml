@@ -27,19 +27,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rustfs:
+        condition: service_healthy
     ports:
       - "5001:5000"
-    volumes:
-      - mlflow-artifacts:/mlflow/artifacts
     # Runs, params, metrics and the model registry go to Postgres. Artifacts
     # (models, roc_curve.png) are uploaded through the server and stored in
     # the mlflow-artifacts volume, so clients never need a shared filesystem.
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY}
     command: >
       mlflow server
       --host 0.0.0.0
       --port 5000
       --backend-store-uri postgresql+psycopg://${POSTGRES_USER:-mlflow}:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/${POSTGRES_DB:-mlflow}
-      --artifacts-destination /mlflow/artifacts
+      --artifacts-destination s3://mlflow-artifacts
       --allowed-hosts localhost:*,127.0.0.1:*,mlflow:*
     restart: unless-stopped
 
@@ -77,7 +81,44 @@ services:
       - .:/app
     restart: unless-stopped
 
+  rustfs_perms:
+      image: alpine
+      user: root
+      volumes:
+        - rustfs-data:/data
+        - rustfs-logs:/logs
+      command: chown -R 10001:10001 /data /logs
+
+  rustfs:
+    image: rustfs/rustfs:1.0.6
+    depends_on:
+      rustfs_perms:
+        condition: service_completed_successfully
+    volumes:
+      - rustfs-data:/data
+      - rustfs-logs:/var/log/rustfs/
+    environment:
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_OBS_LOGGER_LEVEL: error
+      RUSTFS_OBS_LOG_DIRECTORY: "/var/log/rustfs/"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin} 
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+
 volumes:
   postgres-data:
   mlflow-artifacts:
   prefect-data:
+  rustfs-data:
+  rustfs-logs:
